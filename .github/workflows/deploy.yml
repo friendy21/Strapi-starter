@@ -90,6 +90,15 @@ jobs:
           mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
 
+      - name: Copy docker-compose.prod.yml to Droplet
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          echo "📄 Copying docker-compose.prod.yml to Droplet..."
+          scp docker-compose.prod.yml $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/docker-compose.yml
+          scp -r nginx $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/ || echo "⚠️ nginx folder not found, skipping"
+
       - name: Deploy to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
@@ -104,15 +113,14 @@ jobs:
             # Navigate to app directory
             cd ${{ env.DEPLOY_PATH }}
             
+            # Create directories if they don't exist
+            mkdir -p /opt/backups
+            
             # Backup database before deployment
             echo "💾 Creating database backup..."
             docker exec strapi-postgres pg_dump -U strapi strapi > /opt/backups/pre-deploy-$(date +%Y%m%d_%H%M%S).sql || echo "⚠️ Backup failed, continuing..."
             
-            # Pull latest docker-compose configuration
-            echo "📥 Pulling latest configuration..."
-            git pull origin main || echo "⚠️ Git pull failed, using existing config"
-            
-            # Login to Docker Hub (using environment variable for token)
+            # Login to Docker Hub
             echo "🔐 Logging into Docker Hub..."
             echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u ${{ env.DOCKER_USERNAME }} --password-stdin
             
@@ -123,10 +131,10 @@ jobs:
             
             # Stop services
             echo "🛑 Stopping services..."
-            docker-compose down
+            docker-compose down || true
             
-            # Start services with new images
-            echo "🚀 Starting services with new images..."
+            # Start services with new images (uses docker-compose.yml which is docker-compose.prod.yml)
+            echo "🚀 Starting services with Docker Hub images..."
             docker-compose up -d
             
             # Wait for services to be healthy
@@ -138,9 +146,8 @@ jobs:
               echo "✅ Deployment successful!"
               docker-compose ps
             else
-              echo "❌ Deployment failed! Rolling back..."
-              docker-compose down
-              docker-compose up -d
+              echo "❌ Deployment failed!"
+              docker-compose logs
               exit 1
             fi
             
