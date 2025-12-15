@@ -185,14 +185,37 @@ jobs:
             echo "🚀 Starting services with Docker Hub images..."
             docker-compose up -d
             
-            # Wait for services to be healthy
-            echo "⏳ Waiting for services to start..."
-            sleep 30
+            # Wait for PostgreSQL to be ready first
+            echo "⏳ Waiting for PostgreSQL to start..."
+            sleep 15
+            
+            # Show container status
+            echo "📊 Container status after 15 seconds:"
+            docker-compose ps
+            
+            # Show Strapi logs
+            echo "📋 Strapi container logs:"
+            docker-compose logs strapi || docker logs strapi-backend 2>/dev/null || echo "No strapi logs available"
+            
+            # Wait more for Strapi to initialize
+            echo "⏳ Waiting 60 more seconds for Strapi to fully initialize..."
+            sleep 60
+            
+            # Show final status
+            echo "📊 Final container status:"
+            docker-compose ps
+            
+            # Show .env file (masked)
+            echo "📝 Environment file exists and has content:"
+            ls -la .env 2>/dev/null || echo "No .env file found!"
             
             # Check if services are running
             if docker-compose ps | grep -q "Up"; then
-              echo "✅ Deployment successful!"
-              docker-compose ps
+              echo "✅ Containers are running"
+              
+              # Show Strapi logs again
+              echo "📋 Final Strapi logs:"
+              docker-compose logs --tail=50 strapi || docker logs --tail=50 strapi-backend 2>/dev/null
             else
               echo "❌ Deployment failed!"
               docker-compose logs
