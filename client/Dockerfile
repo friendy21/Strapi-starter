@@ -23,8 +23,11 @@ ARG NEXT_PUBLIC_STRAPI_URL
 ARG STRAPI_BASE_URL
 
 ENV NEXT_PUBLIC_STRAPI_URL=${NEXT_PUBLIC_STRAPI_URL}
-ENV STRAPI_BASE_URL=${STRAPI_BASE_URL}
+# Set empty STRAPI_BASE_URL during build to skip static generation
+# Real URL will be set at runtime via docker-compose
+ENV STRAPI_BASE_URL=""
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_STATIC_GENERATION=true
 
 # Build the application
 RUN npm run build
