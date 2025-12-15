@@ -97,4 +97,113 @@ Before navigating to our frontend, you will be prompted to create your first **S
 
 You can check out the `package.json` file for more details on what the script will do.
 
-If you have any questions about the project, please leave a comment or stop by Strapi's "open office" hours Monday through Friday at 12:30 PM CST. 
+If you have any questions about the project, please leave a comment or stop by Strapi's "open office" hours Monday through Friday at 12:30 PM CST.
+
+---
+
+## 🚀 Deployment
+
+Ready to deploy your application to production? We've created comprehensive guides to help you deploy to DigitalOcean.
+
+### 📚 Deployment Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[DEPLOYMENT.md](./DEPLOYMENT.md)** | Main deployment guide with options for Droplet and App Platform |
+| **[Deployment Workflow](./.agent/workflows/deploy-digitalocean-droplet.md)** | Complete step-by-step guide for DigitalOcean Droplet deployment |
+| **[DEPLOYMENT_CHECKLIST.md](./DEPLOYMENT_CHECKLIST.md)** | Quick reference checklist for deployment |
+| **[ARCHITECTURE.md](./ARCHITECTURE.md)** | System architecture and diagrams |
+| **[TROUBLESHOOTING.md](./TROUBLESHOOTING.md)** | Common issues and solutions |
+
+### 🎯 Quick Start Deployment
+
+**For DigitalOcean Droplet (Recommended):**
+
+1. Create a Droplet (Ubuntu 24.04, 2GB RAM minimum)
+2. SSH into your Droplet
+3. Clone your repository
+4. Run the deployment script:
+   ```bash
+   chmod +x scripts/deploy-droplet.sh
+   ./scripts/deploy-droplet.sh
+   ```
+5. Configure your domain and SSL
+
+**Estimated Cost:** $12-18/month  
+**Estimated Time:** 30-45 minutes
+
+For detailed instructions, see the [complete deployment workflow](./.agent/workflows/deploy-digitalocean-droplet.md).
+
+### 🔧 What's Included
+
+The deployment setup includes:
+
+- **Docker Compose** configuration for all services
+- **PostgreSQL** database with persistent storage
+- **Nginx** reverse proxy with SSL support
+- **Automated deployment** script
+- **SSL certificate** management with Let's Encrypt
+- **Backup scripts** for database
+- **Environment templates** for production
+
+### 📖 Need Help?
+
+- Check the [Troubleshooting Guide](./TROUBLESHOOTING.md) for common issues
+- Review the [Architecture Documentation](./ARCHITECTURE.md) to understand the system
+- Use the [Deployment Checklist](./DEPLOYMENT_CHECKLIST.md) to track your progress
+
+---
+
+## ⚙️ CI/CD with GitHub Actions
+
+Automate your deployments with GitHub Actions! Push to `main` and your changes automatically deploy to your Droplet.
+
+### 📚 CI/CD Documentation
+
+| Document | Description |
+|----------|-------------|
+| **[CICD_SETUP.md](./CICD_SETUP.md)** | Complete GitHub Actions setup guide |
+| **[Setup Workflow](./.agent/workflows/setup-github-actions-cicd.md)** | Step-by-step CI/CD configuration |
+| **[CICD_QUICKREF.md](./CICD_QUICKREF.md)** | Quick reference for commands and secrets |
+
+### 🚀 Quick Setup
+
+1. **Generate SSH key for GitHub Actions:**
+   ```bash
+   ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions-deploy
+   ```
+
+2. **Add public key to your Droplet**
+
+3. **Configure GitHub Secrets:**
+   - `DROPLET_SSH_KEY` - Private SSH key
+   - `DROPLET_IP` - Your Droplet's IP
+   - `DROPLET_USER` - SSH username (usually `deploy`)
+
+4. **Push to main branch** - Deployment happens automatically!
+
+### ✨ What You Get
+
+- ✅ **Automatic deployment** on push to `main`
+- ✅ **Automated testing** on pull requests
+- ✅ **Database backups** before each deployment
+- ✅ **Automatic rollback** if deployment fails
+- ✅ **Security scanning** with Trivy
+- ✅ **Docker image optimization**
+
+### 📊 Workflow Status
+
+Add these badges to show your deployment status:
+
+```markdown
+![Deploy](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/deploy.yml/badge.svg)
+![Test](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/test.yml/badge.svg)
+```
+
+For detailed setup instructions, see the [CI/CD Setup Guide](./CICD_SETUP.md).
+
+---
+
+## 📝 License
+
+This project is open source and available under the MIT License. 

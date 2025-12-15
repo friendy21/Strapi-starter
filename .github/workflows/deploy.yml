@@ -1,0 +1,114 @@
+name: Deploy to DigitalOcean Droplet
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual trigger
+
+env:
+  DEPLOY_PATH: /opt/strapi-app
+
+jobs:
+  deploy:
+    name: Deploy Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
+
+      - name: Add Droplet to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to Droplet
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          ssh $DROPLET_USER@$DROPLET_IP << 'ENDSSH'
+            set -e
+            
+            echo "🚀 Starting deployment..."
+            
+            # Navigate to app directory
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Pull latest changes
+            echo "📥 Pulling latest code..."
+            git pull origin main
+            
+            # Backup database before deployment
+            echo "💾 Creating database backup..."
+            docker exec strapi-postgres pg_dump -U strapi strapi > /opt/backups/pre-deploy-$(date +%Y%m%d_%H%M%S).sql || echo "⚠️ Backup failed, continuing..."
+            
+            # Stop services
+            echo "🛑 Stopping services..."
+            docker-compose down
+            
+            # Rebuild and start services
+            echo "🏗️ Building and starting services..."
+            docker-compose up -d --build
+            
+            # Wait for services to be healthy
+            echo "⏳ Waiting for services to start..."
+            sleep 30
+            
+            # Check if services are running
+            if docker-compose ps | grep -q "Up"; then
+              echo "✅ Deployment successful!"
+              docker-compose ps
+            else
+              echo "❌ Deployment failed! Rolling back..."
+              git reset --hard HEAD~1
+              docker-compose up -d
+              exit 1
+            fi
+            
+            # Clean up old Docker images
+            echo "🧹 Cleaning up old images..."
+            docker image prune -f
+            
+            echo "🎉 Deployment complete!"
+          ENDSSH
+
+      - name: Verify Deployment
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+        run: |
+          echo "🔍 Verifying deployment..."
+          sleep 10
+          
+          # Check if frontend is accessible
+          if curl -f -s -o /dev/null http://$DROPLET_IP; then
+            echo "✅ Frontend is accessible"
+          else
+            echo "❌ Frontend is not accessible"
+            exit 1
+          fi
+          
+          # Check if Strapi admin is accessible
+          if curl -f -s -o /dev/null http://$DROPLET_IP/admin; then
+            echo "✅ Strapi admin is accessible"
+          else
+            echo "❌ Strapi admin is not accessible"
+            exit 1
+          fi
+
+      - name: Notify on Success
+        if: success()
+        run: |
+          echo "🎉 Deployment to ${{ secrets.DROPLET_IP }} completed successfully!"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Deployment to ${{ secrets.DROPLET_IP }} failed!"
+          echo "Check the logs above for details."
