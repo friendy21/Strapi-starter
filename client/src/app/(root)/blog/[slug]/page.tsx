@@ -6,6 +6,9 @@ import { MarkdownText } from "@/components/custom/markdown-text";
 import { StrapiImage } from "@/components/custom/strapi-image";
 import { getBlogPostBySlug } from "@/data/loaders";
 import { BlockRenderer } from "@/components/block-renderer";
+
+// Force dynamic rendering since this page needs Strapi data
+export const dynamic = 'force-dynamic';
 interface PageProps {
   params: Promise<{ slug: string }>;
 }

@@ -6,11 +6,11 @@ Quick setup guide for Docker Hub-based GitHub Actions CI/CD.
 
 | Secret Name | Value | Where to Get |
 |-------------|-------|--------------|
-| `DOCKER_HUB_TOKEN` | `YOUR_DOCKER_HUB_TOKEN` | Docker Hub → Account Settings → Security |
+| `DOCKER_HUB_TOKEN` | Your Docker Hub token | Docker Hub → Account Settings → Security |
 | `DROPLET_SSH_KEY` | Private SSH key | `cat ~/.ssh/github-actions-deploy` |
-| `DROPLET_IP` | Droplet IP address | DigitalOcean dashboard |
-| `DROPLET_USER` | SSH username | Usually `deploy` |
-| `NEXT_PUBLIC_STRAPI_URL` | Public URL | `https://yourdomain.com` |
+| `DROPLET_IP` | `134.209.107.38` | Worker-04 IP address |
+| `DROPLET_USER` | SSH username | Usually `root` or `deploy` |
+| `NEXT_PUBLIC_STRAPI_URL` | Public URL | `https://yourdomain.com` or `http://134.209.107.38` |
 
 **Add at:** GitHub Repo → Settings → Secrets and variables → Actions
 

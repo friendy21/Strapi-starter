@@ -7,6 +7,9 @@ import { CategorySelect } from "@/components/custom/category-select";
 import { formatDate } from "@/lib/utils";
 import { getBlogPosts } from "@/data/loaders";
 
+// Force dynamic rendering since this page needs Strapi data
+export const dynamic = 'force-dynamic';
+
 interface PageProps {
   searchParams: Promise<{ page?: string; query?: string; category?: string }>
 }
