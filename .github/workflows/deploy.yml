@@ -108,39 +108,35 @@ jobs:
           ssh $DROPLET_USER@$DROPLET_IP 'bash -s' << 'ENDSSH'
             cd /opt/strapi-app
             
-            # Create .env file if it doesn't exist
-            if [ ! -f .env ]; then
-              echo "🔑 Generating Strapi secrets..."
-              
-              # Generate secure random secrets
-              JWT_SECRET=$(openssl rand -base64 32)
-              ADMIN_JWT_SECRET=$(openssl rand -base64 32)
-              APP_KEY1=$(openssl rand -base64 32)
-              APP_KEY2=$(openssl rand -base64 32)
-              APP_KEY3=$(openssl rand -base64 32)
-              APP_KEY4=$(openssl rand -base64 32)
-              API_TOKEN_SALT=$(openssl rand -base64 32)
-              TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
-              DB_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-              
-              # Create .env file with echo commands
-              echo "# Auto-generated Strapi production secrets" > .env
-              echo "DATABASE_USERNAME=strapi" >> .env
-              echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
-              echo "DATABASE_NAME=strapi" >> .env
-              echo "" >> .env
-              echo "JWT_SECRET=${JWT_SECRET}" >> .env
-              echo "ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}" >> .env
-              echo "APP_KEYS=${APP_KEY1},${APP_KEY2},${APP_KEY3},${APP_KEY4}" >> .env
-              echo "API_TOKEN_SALT=${API_TOKEN_SALT}" >> .env
-              echo "TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}" >> .env
-              echo "" >> .env
-              echo "NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)" >> .env
-              
-              echo "✅ .env file created with generated secrets"
-            else
-              echo "ℹ️ .env file already exists, keeping existing secrets"
-            fi
+            # Always regenerate .env for clean deployment
+            echo "🔑 Generating fresh Strapi secrets..."
+            
+            # Generate secure random secrets
+            JWT_SECRET=$(openssl rand -base64 32)
+            ADMIN_JWT_SECRET=$(openssl rand -base64 32)
+            APP_KEY1=$(openssl rand -base64 32)
+            APP_KEY2=$(openssl rand -base64 32)
+            APP_KEY3=$(openssl rand -base64 32)
+            APP_KEY4=$(openssl rand -base64 32)
+            API_TOKEN_SALT=$(openssl rand -base64 32)
+            TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
+            DB_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
+            
+            # Create fresh .env file
+            echo "# Auto-generated Strapi production secrets" > .env
+            echo "DATABASE_USERNAME=strapi" >> .env
+            echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
+            echo "DATABASE_NAME=strapi" >> .env
+            echo "" >> .env
+            echo "JWT_SECRET=${JWT_SECRET}" >> .env
+            echo "ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}" >> .env
+            echo "APP_KEYS=${APP_KEY1},${APP_KEY2},${APP_KEY3},${APP_KEY4}" >> .env
+            echo "API_TOKEN_SALT=${API_TOKEN_SALT}" >> .env
+            echo "TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}" >> .env
+            echo "" >> .env
+            echo "NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)" >> .env
+            
+            echo "✅ Fresh .env file created with new secrets"
           ENDSSH
 
       - name: Deploy to Droplet
@@ -175,14 +171,15 @@ jobs:
             
             # Stop services
             echo "🛑 Stopping services..."
-            docker-compose down || true
+            docker-compose down -v || true
             
             # Stop any existing nginx/apache using port 80
-            echo "🔌 Freeing up port 80..."
+            echo "🔌 Freeing up ports..."
             sudo systemctl stop nginx 2>/dev/null || true
             sudo systemctl stop apache2 2>/dev/null || true
             sudo fuser -k 80/tcp 2>/dev/null || true
             sudo fuser -k 443/tcp 2>/dev/null || true
+            sudo fuser -k 8080/tcp 2>/dev/null || true
             
             # Start services with new images (uses docker-compose.yml which is docker-compose.prod.yml)
             echo "🚀 Starting services with Docker Hub images..."
