@@ -1,61 +1,93 @@
 ---
-description: Set up GitHub Actions CI/CD for automated deployment to DigitalOcean Droplet
+description: Set up GitHub Actions CI/CD with Docker Hub for automated deployment
 ---
 
-# GitHub Actions CI/CD Setup
+# GitHub Actions CI/CD with Docker Hub
 
-This workflow guides you through setting up automated deployment using GitHub Actions.
+This workflow guides you through setting up automated deployment using GitHub Actions and Docker Hub.
+
+## Overview
+
+**How it works:**
+1. Push code to GitHub `main` branch
+2. GitHub Actions builds Docker images
+3. Images pushed to Docker Hub
+4. Droplet pulls images and restarts services
+
+**Benefits:**
+- ✅ Faster deployments (no building on Droplet)
+- ✅ Consistent images across environments
+- ✅ Easy rollback to previous versions
+- ✅ Reduced Droplet resource usage
 
 ## Prerequisites
 
-- [ ] Application already deployed manually to DigitalOcean Droplet
-- [ ] GitHub repository with your code
-- [ ] SSH access to your Droplet
-
-## Part 1: Generate SSH Key for GitHub Actions
-
-### Step 1: Create Dedicated SSH Key
-
-**On your local machine:**
-
-```bash
-# Generate SSH key for GitHub Actions
-ssh-keygen -t ed25519 -C "github-actions-deploy" -f ~/.ssh/github-actions-deploy
-
-# When prompted for passphrase, press Enter (no passphrase for automation)
-```
-
-### Step 2: Display Keys
-
-```bash
-# Display PRIVATE key (for GitHub Secrets)
-cat ~/.ssh/github-actions-deploy
-
-# Display PUBLIC key (for Droplet)
-cat ~/.ssh/github-actions-deploy.pub
-```
-
-**Copy both keys** - you'll need them in the next steps.
+- [ ] Docker Hub account (username: `friendy21`)
+- [ ] Docker Hub access token
+- [ ] Application deployed to DigitalOcean Droplet
+- [ ] GitHub repository
 
 ---
 
-## Part 2: Configure Droplet
+## Part 1: Configure Docker Hub
 
-### Step 3: Add Public Key to Droplet
+### Step 1: Create Docker Hub Access Token
 
-**SSH into your Droplet:**
+1. **Go to [Docker Hub](https://hub.docker.com/)**
+2. **Click your profile** → **Account Settings**
+3. **Click "Security"** → **"New Access Token"**
+4. **Name:** `github-actions-deploy`
+5. **Permissions:** Read, Write, Delete
+6. **Click "Generate"**
+7. **Copy the token** (you won't see it again!)
+
+**Your token:** `YOUR_DOCKER_HUB_TOKEN` (add to GitHub Secrets, not here!)
+
+---
+
+## Part 2: Configure GitHub Secrets
+
+### Step 2: Add GitHub Secrets
+
+1. **Go to your GitHub repository**
+2. **Click Settings** → **Secrets and variables** → **Actions**
+3. **Click "New repository secret"**
+
+**Add these 4 secrets:**
+
+| Secret Name | Value | Description |
+|-------------|-------|-------------|
+| `DOCKER_HUB_TOKEN` | `YOUR_DOCKER_HUB_TOKEN` | Docker Hub access token |
+| `DROPLET_SSH_KEY` | Your SSH private key | For connecting to Droplet |
+| `DROPLET_IP` | Your Droplet IP | e.g., `164.92.123.45` |
+| `DROPLET_USER` | `deploy` | SSH username |
+| `NEXT_PUBLIC_STRAPI_URL` | `https://yourdomain.com` | Public Strapi URL |
+
+---
+
+## Part 3: Generate SSH Key (if not done)
+
+### Step 3: Create SSH Key for GitHub Actions
 
 ```bash
-ssh deploy@YOUR_DROPLET_IP
+# Generate SSH key
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions-deploy
+
+# Display private key (for GitHub Secret)
+cat ~/.ssh/github-actions-deploy
+
+# Display public key (for Droplet)
+cat ~/.ssh/github-actions-deploy.pub
 ```
 
-**Add the public key:**
+### Step 4: Add Public Key to Droplet
 
 ```bash
-# Add public key to authorized_keys
-echo "PASTE_YOUR_PUBLIC_KEY_HERE" >> ~/.ssh/authorized_keys
+# SSH into Droplet
+ssh deploy@YOUR_DROPLET_IP
 
-# Verify permissions
+# Add public key
+echo "YOUR_PUBLIC_KEY_HERE" >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
 chmod 700 ~/.ssh
 
@@ -63,320 +95,331 @@ chmod 700 ~/.ssh
 exit
 ```
 
-### Step 4: Configure Git on Droplet
+---
 
-**SSH back into your Droplet:**
+## Part 4: Update Droplet Configuration
+
+### Step 5: Update docker-compose.yml on Droplet
+
+**SSH into your Droplet:**
 
 ```bash
 ssh deploy@YOUR_DROPLET_IP
+cd /opt/strapi-app
+```
 
-# Navigate to app directory
+**Backup current docker-compose.yml:**
+
+```bash
+cp docker-compose.yml docker-compose.yml.backup
+```
+
+**Replace with production version:**
+
+```bash
+# Pull latest code (includes docker-compose.prod.yml)
+git pull origin main
+
+# Use production compose file
+cp docker-compose.prod.yml docker-compose.yml
+
+# Or create symlink
+ln -sf docker-compose.prod.yml docker-compose.yml
+```
+
+**Verify the file:**
+
+```bash
+cat docker-compose.yml | grep "image:"
+# Should show:
+# image: friendy21/strapi-starter-backend:latest
+# image: friendy21/strapi-starter-frontend:latest
+```
+
+### Step 6: Configure Git on Droplet
+
+```bash
+# Still on Droplet
 cd /opt/strapi-app
 
-# Configure git safe directory
+# Configure git
 git config --global --add safe.directory /opt/strapi-app
 
-# Verify git remote
+# Verify remote
 git remote -v
 
 # If no remote, add it
 git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 
-# Pull latest code
+# Pull latest
 git pull origin main
-
-# Exit
-exit
 ```
 
 ---
 
-## Part 3: Configure GitHub Secrets
+## Part 5: Test the CI/CD Pipeline
 
-### Step 5: Add Secrets to GitHub
-
-1. **Go to your GitHub repository**
-2. **Click Settings** → **Secrets and variables** → **Actions**
-3. **Click "New repository secret"**
-
-**Add these 3 secrets:**
-
-#### Secret 1: DROPLET_SSH_KEY
-
-- **Name:** `DROPLET_SSH_KEY`
-- **Value:** Paste the entire PRIVATE key from Step 2
-  ```
-  -----BEGIN OPENSSH PRIVATE KEY-----
-  b3BlbnNzaC1rZXktdjEAAAAABG5vbmU...
-  ... (entire private key)
-  -----END OPENSSH PRIVATE KEY-----
-  ```
-
-#### Secret 2: DROPLET_IP
-
-- **Name:** `DROPLET_IP`
-- **Value:** Your Droplet's IP address (e.g., `164.92.123.45`)
-
-#### Secret 3: DROPLET_USER
-
-- **Name:** `DROPLET_USER`
-- **Value:** `deploy` (or your SSH username)
-
----
-
-## Part 4: Test CI/CD Pipeline
-
-### Step 6: Commit and Push Workflow Files
+### Step 7: Commit and Push Workflows
 
 **On your local machine:**
 
 ```bash
-# Check if workflow files exist
+# Check workflow files
 ls .github/workflows/
+# Should show: deploy.yml, test.yml
 
-# Should show:
-# - deploy.yml
-# - test.yml
-
-# Add and commit
-git add .github/workflows/
-git commit -m "feat: add GitHub Actions CI/CD workflows"
+# Add all changes
+git add .
+git commit -m "feat: add Docker Hub CI/CD workflow"
 
 # Push to trigger deployment
 git push origin main
 ```
 
-### Step 7: Monitor Deployment
+### Step 8: Monitor Deployment
 
-1. **Go to your GitHub repository**
-2. **Click the "Actions" tab**
-3. **Click on the running workflow**
-4. **Watch the deployment in real-time**
+1. **Go to GitHub** → **Actions** tab
+2. **Click on the running workflow**
+3. **Watch the progress:**
+   - ✅ Build and Push to Docker Hub
+   - ✅ Deploy to Droplet
 
-Expected steps:
-- ✅ Checkout code
-- ✅ Setup SSH
-- ✅ Add Droplet to known hosts
-- ✅ Deploy to Droplet
-- ✅ Verify Deployment
-- ✅ Notify on Success
+**Expected flow:**
+```
+Build and Push to Docker Hub (3-5 min)
+  ├─ Build Strapi image
+  ├─ Push to friendy21/strapi-starter-backend:latest
+  ├─ Build Next.js image
+  └─ Push to friendy21/strapi-starter-frontend:latest
 
-### Step 8: Verify Deployment
+Deploy to Droplet (1-2 min)
+  ├─ SSH into Droplet
+  ├─ Backup database
+  ├─ Pull images from Docker Hub
+  ├─ Restart services
+  └─ Verify deployment
+```
 
-**Check your website:**
-- Visit `http://YOUR_DROPLET_IP` or `https://yourdomain.com`
-- Verify the latest changes are live
+### Step 9: Verify Deployment
+
+**Check Docker Hub:**
+1. Go to [Docker Hub](https://hub.docker.com/)
+2. Check repositories:
+   - `friendy21/strapi-starter-backend`
+   - `friendy21/strapi-starter-frontend`
+3. Verify latest tag exists
 
 **Check Droplet:**
 ```bash
 ssh deploy@YOUR_DROPLET_IP
 cd /opt/strapi-app
+
+# Check running containers
 docker-compose ps
-# All services should be "Up"
+
+# Verify images are from Docker Hub
+docker images | grep friendy21
+
+# Check logs
+docker-compose logs -f
 ```
 
----
-
-## Part 5: Test Pull Request Workflow
-
-### Step 9: Create a Test PR
-
-```bash
-# Create a new branch
-git checkout -b test-cicd
-
-# Make a small change
-echo "# CI/CD Test" >> TEST.md
-
-# Commit and push
-git add TEST.md
-git commit -m "test: CI/CD pipeline"
-git push origin test-cicd
-```
-
-### Step 10: Create Pull Request
-
-1. **Go to GitHub repository**
-2. **Click "Pull requests"** → **"New pull request"**
-3. **Select `test-cicd` branch**
-4. **Click "Create pull request"**
-
-**Watch the test workflow run:**
-- ✅ Test Strapi Backend
-- ✅ Test Next.js Frontend
-- ✅ Test Docker Build
-- ✅ Security Scan
+**Check Website:**
+- Visit `http://YOUR_DROPLET_IP` or `https://yourdomain.com`
+- Verify latest changes are live
 
 ---
 
 ## Workflow Behavior
 
-### Automatic Deployment (deploy.yml)
+### Automatic Deployment
 
 **Triggers:**
 - Push to `main` branch
-- Manual trigger via Actions UI
+- Manual trigger via GitHub Actions UI
 
-**What it does:**
-1. Connects to Droplet via SSH
-2. Pulls latest code
-3. Creates database backup
-4. Stops services
-5. Rebuilds Docker images
-6. Starts services
-7. Verifies deployment
-8. Cleans up old images
+**What happens:**
+1. **Build Phase (GitHub Actions):**
+   - Checkout code
+   - Build Strapi Docker image
+   - Build Next.js Docker image
+   - Push both images to Docker Hub
+   - Tag with `latest` and commit SHA
 
-### Automated Testing (test.yml)
+2. **Deploy Phase (Droplet):**
+   - SSH into Droplet
+   - Backup database
+   - Login to Docker Hub
+   - Pull latest images
+   - Stop services
+   - Start services with new images
+   - Verify deployment
+   - Cleanup old images
+
+### Automated Testing
 
 **Triggers:**
 - Pull requests to `main`
 - Push to `develop` branch
 
-**What it does:**
-1. Tests Strapi build
-2. Tests Next.js build
-3. Runs linting
-4. Tests Docker builds
-5. Runs security scans
+**What happens:**
+- Lint and build Strapi
+- Lint and build Next.js
+- Test Docker builds
+- Security scanning
+
+---
+
+## Docker Hub Images
+
+Your images are now publicly available:
+
+| Image | Docker Hub URL |
+|-------|----------------|
+| **Strapi Backend** | `docker pull friendy21/strapi-starter-backend:latest` |
+| **Next.js Frontend** | `docker pull friendy21/strapi-starter-frontend:latest` |
+
+**View on Docker Hub:**
+- Backend: https://hub.docker.com/r/friendy21/strapi-starter-backend
+- Frontend: https://hub.docker.com/r/friendy21/strapi-starter-frontend
 
 ---
 
 ## Troubleshooting
 
-### ❌ SSH Permission Denied
-
-**Error in Actions:**
-```
-Permission denied (publickey)
-```
-
-**Fix:**
-1. Verify `DROPLET_SSH_KEY` secret contains the PRIVATE key
-2. Verify public key is in `~/.ssh/authorized_keys` on Droplet
-3. Check key permissions on Droplet:
-   ```bash
-   chmod 600 ~/.ssh/authorized_keys
-   chmod 700 ~/.ssh
-   ```
-
-### ❌ Git Pull Failed
+### ❌ Docker Hub Login Failed
 
 **Error:**
 ```
-fatal: not a git repository
+Error: Cannot perform an interactive login from a non TTY device
+```
+
+**Fix:**
+Verify `DOCKER_HUB_TOKEN` secret is set correctly in GitHub.
+
+### ❌ Image Push Failed
+
+**Error:**
+```
+denied: requested access to the resource is denied
+```
+
+**Fix:**
+1. Verify Docker Hub token has Write permissions
+2. Check repository names match: `friendy21/strapi-starter-backend`
+
+### ❌ Image Pull Failed on Droplet
+
+**Error:**
+```
+Error response from daemon: pull access denied
 ```
 
 **Fix:**
 ```bash
+# SSH into Droplet
 ssh deploy@YOUR_DROPLET_IP
-cd /opt/strapi-app
-git init
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git fetch origin
-git reset --hard origin/main
+
+# Login to Docker Hub manually
+docker login -u friendy21
+
+# Test pull
+docker pull friendy21/strapi-starter-backend:latest
 ```
 
-### ❌ Docker Build Failed
+### ❌ Services Won't Start
 
 **Error:**
 ```
-ERROR: failed to solve
+Container exited with code 1
 ```
 
 **Fix:**
 ```bash
-ssh deploy@YOUR_DROPLET_IP
-cd /opt/strapi-app
+# Check logs
+docker-compose logs strapi
+docker-compose logs nextjs
 
-# Check disk space
-df -h
+# Verify environment variables
+cat .env
 
-# Clean up Docker
-docker system prune -a
-
-# Rebuild manually
-docker-compose up -d --build
+# Restart services
+docker-compose down
+docker-compose up -d
 ```
-
-### ❌ Deployment Verification Failed
-
-**Error:**
-```
-Frontend is not accessible
-```
-
-**Fix:**
-1. Increase wait time in workflow (edit `.github/workflows/deploy.yml`)
-2. Change `sleep 10` to `sleep 30`
-3. Check if services are running:
-   ```bash
-   docker-compose ps
-   docker-compose logs
-   ```
 
 ---
 
-## Customization
+## Manual Operations
 
-### Change Deployment Branch
+### Pull Latest Images Manually
 
-Edit `.github/workflows/deploy.yml`:
+```bash
+ssh deploy@YOUR_DROPLET_IP
+cd /opt/strapi-app
 
-```yaml
-on:
-  push:
-    branches:
-      - production  # Change from 'main'
+# Login to Docker Hub
+docker login -u friendy21
+
+# Pull images
+docker pull friendy21/strapi-starter-backend:latest
+docker pull friendy21/strapi-starter-frontend:latest
+
+# Restart services
+docker-compose down
+docker-compose up -d
 ```
 
-### Add Notifications
+### Rollback to Previous Version
 
-Add Slack notification step to `deploy.yml`:
+```bash
+# SSH into Droplet
+ssh deploy@YOUR_DROPLET_IP
+cd /opt/strapi-app
 
-```yaml
-- name: Notify Slack
-  if: always()
-  uses: 8398a7/action-slack@v3
-  with:
-    status: ${{ job.status }}
-    webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+# Pull specific version (use commit SHA)
+docker pull friendy21/strapi-starter-backend:sha-abc1234
+docker pull friendy21/strapi-starter-frontend:sha-abc1234
+
+# Update docker-compose.yml to use specific tags
+# Then restart
+docker-compose down
+docker-compose up -d
 ```
 
-### Deploy Only on Tag
+### View Image History
 
-```yaml
-on:
-  push:
-    tags:
-      - 'v*'  # Only deploy on version tags
+```bash
+# On Droplet
+docker images | grep friendy21
+
+# Shows all versions with tags
 ```
 
 ---
 
 ## Best Practices
 
-1. **Test locally first** - Always test changes before pushing
-2. **Use feature branches** - Never push directly to main
-3. **Review PRs** - Enable branch protection and require reviews
-4. **Monitor deployments** - Watch Actions tab during deployment
-5. **Keep secrets secure** - Never commit secrets to repository
-6. **Rotate SSH keys** - Change deployment keys every 90 days
-7. **Enable notifications** - Get alerted on deployment failures
+1. **Use version tags** - Tag images with commit SHA for rollback
+2. **Keep images small** - Use multi-stage builds (already configured)
+3. **Scan for vulnerabilities** - Automated in test workflow
+4. **Clean up old images** - Automated in deployment
+5. **Monitor image sizes** - Check Docker Hub dashboard
+6. **Use private repos** - For production (upgrade Docker Hub plan)
 
 ---
 
 ## Next Steps
 
-- [ ] Enable branch protection on `main`
-- [ ] Set up Slack/Discord notifications
-- [ ] Create staging environment workflow
-- [ ] Add deployment approval gates
-- [ ] Set up monitoring and alerts
-- [ ] Document deployment process for team
+- [ ] Test the deployment workflow
+- [ ] Verify images on Docker Hub
+- [ ] Create a test pull request
+- [ ] Set up image scanning alerts
+- [ ] Consider private Docker Hub repositories
+- [ ] Add deployment notifications
 
 ---
 
-**Congratulations! Your CI/CD pipeline is now active! 🎉**
+**Congratulations! Your Docker Hub CI/CD pipeline is ready! 🎉**
 
-Every push to `main` will automatically deploy to your Droplet.
+Every push to `main` builds images and deploys automatically.

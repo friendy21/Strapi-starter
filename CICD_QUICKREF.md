@@ -1,97 +1,110 @@
-# GitHub Actions CI/CD - Quick Reference
+# Docker Hub CI/CD - Quick Reference
 
-Quick commands and checklist for GitHub Actions setup.
+Quick setup guide for Docker Hub-based GitHub Actions CI/CD.
 
-## 🔑 SSH Key Setup
-
-```bash
-# Generate key
-ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions-deploy
-
-# View private key (for GitHub Secret)
-cat ~/.ssh/github-actions-deploy
-
-# View public key (for Droplet)
-cat ~/.ssh/github-actions-deploy.pub
-```
-
-## 🔐 GitHub Secrets Required
+## 🔐 Required GitHub Secrets
 
 | Secret Name | Value | Where to Get |
 |-------------|-------|--------------|
+| `DOCKER_HUB_TOKEN` | `YOUR_DOCKER_HUB_TOKEN` | Docker Hub → Account Settings → Security |
 | `DROPLET_SSH_KEY` | Private SSH key | `cat ~/.ssh/github-actions-deploy` |
 | `DROPLET_IP` | Droplet IP address | DigitalOcean dashboard |
 | `DROPLET_USER` | SSH username | Usually `deploy` |
+| `NEXT_PUBLIC_STRAPI_URL` | Public URL | `https://yourdomain.com` |
 
 **Add at:** GitHub Repo → Settings → Secrets and variables → Actions
 
-## 🖥️ Droplet Configuration
+## 🐳 Docker Hub Images
 
+| Service | Image | Pull Command |
+|---------|-------|--------------|
+| **Strapi** | `friendy21/strapi-starter-backend` | `docker pull friendy21/strapi-starter-backend:latest` |
+| **Next.js** | `friendy21/strapi-starter-frontend` | `docker pull friendy21/strapi-starter-frontend:latest` |
+
+## 🚀 Quick Setup
+
+### 1. Generate SSH Key
 ```bash
-# SSH into Droplet
-ssh deploy@YOUR_DROPLET_IP
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions-deploy
+cat ~/.ssh/github-actions-deploy      # Private key → GitHub Secret
+cat ~/.ssh/github-actions-deploy.pub  # Public key → Droplet
+```
 
-# Add public key
+### 2. Add Public Key to Droplet
+```bash
+ssh deploy@YOUR_DROPLET_IP
 echo "YOUR_PUBLIC_KEY" >> ~/.ssh/authorized_keys
 chmod 600 ~/.ssh/authorized_keys
-chmod 700 ~/.ssh
+```
+
+### 3. Update Droplet Configuration
+```bash
+ssh deploy@YOUR_DROPLET_IP
+cd /opt/strapi-app
+
+# Backup current config
+cp docker-compose.yml docker-compose.yml.backup
+
+# Use production config (pulls from Docker Hub)
+cp docker-compose.prod.yml docker-compose.yml
 
 # Configure git
-cd /opt/strapi-app
 git config --global --add safe.directory /opt/strapi-app
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
 git pull origin main
 ```
 
-## 📋 Workflow Files
+### 4. Add GitHub Secrets
+Go to: GitHub → Settings → Secrets and variables → Actions
 
-| File | Purpose | Trigger |
-|------|---------|---------|
-| `.github/workflows/deploy.yml` | Automated deployment | Push to `main` |
-| `.github/workflows/test.yml` | Testing & linting | Pull requests |
+Add all 5 secrets listed above.
 
-## 🚀 Deployment Flow
+### 5. Push to Deploy
+```bash
+git add .
+git commit -m "feat: add Docker Hub CI/CD"
+git push origin main
+```
+
+## 📊 Deployment Flow
 
 ```
 Push to main
     ↓
-GitHub Actions triggered
+GitHub Actions builds images
+    ↓
+Push to Docker Hub
+    ├─ friendy21/strapi-starter-backend:latest
+    └─ friendy21/strapi-starter-frontend:latest
     ↓
 SSH into Droplet
     ↓
-Pull latest code
+Pull images from Docker Hub
     ↓
-Backup database
-    ↓
-Rebuild & restart services
-    ↓
-Verify deployment
-    ↓
-Clean up old images
+Restart services
     ↓
 ✅ Deployment complete
 ```
 
-## ✅ Setup Checklist
+## 🔧 Common Commands
 
-- [ ] SSH key generated
-- [ ] Public key added to Droplet
-- [ ] Private key added to GitHub Secrets
-- [ ] `DROPLET_IP` secret added
-- [ ] `DROPLET_USER` secret added
-- [ ] Git configured on Droplet
-- [ ] Workflow files committed
-- [ ] Test deployment triggered
-- [ ] Deployment verified
+### View Images on Droplet
+```bash
+ssh deploy@YOUR_DROPLET_IP
+docker images | grep friendy21
+```
 
-## 🔍 Monitor Deployment
+### Pull Latest Images Manually
+```bash
+ssh deploy@YOUR_DROPLET_IP
+cd /opt/strapi-app
+docker login -u friendy21
+docker pull friendy21/strapi-starter-backend:latest
+docker pull friendy21/strapi-starter-frontend:latest
+docker-compose down
+docker-compose up -d
+```
 
-**GitHub:**
-- Go to Actions tab
-- Click on running workflow
-- Watch real-time logs
-
-**Droplet:**
+### Check Deployment Status
 ```bash
 ssh deploy@YOUR_DROPLET_IP
 cd /opt/strapi-app
@@ -99,70 +112,66 @@ docker-compose ps
 docker-compose logs -f
 ```
 
+### Rollback to Previous Version
+```bash
+# Use specific commit SHA tag
+docker pull friendy21/strapi-starter-backend:sha-abc1234
+docker pull friendy21/strapi-starter-frontend:sha-abc1234
+# Update docker-compose.yml tags, then restart
+docker-compose down && docker-compose up -d
+```
+
 ## 🆘 Quick Fixes
 
-### SSH Permission Denied
+### Docker Hub Login Failed
 ```bash
-# On Droplet
-chmod 600 ~/.ssh/authorized_keys
-chmod 700 ~/.ssh
+# Verify token in GitHub Secrets
 ```
 
-### Git Not Configured
+### Image Pull Failed
 ```bash
-# On Droplet
-cd /opt/strapi-app
-git init
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git pull origin main
+# Login to Docker Hub on Droplet
+ssh deploy@YOUR_DROPLET_IP
+docker login -u friendy21
+# Enter token when prompted
 ```
 
-### Services Not Starting
+### Services Won't Start
 ```bash
-# On Droplet
+ssh deploy@YOUR_DROPLET_IP
 cd /opt/strapi-app
-docker-compose down
-docker-compose up -d --build
 docker-compose logs
-```
-
-## 📊 Workflow Status Badges
-
-Add to `README.md`:
-
-```markdown
-![Deploy](https://github.com/USERNAME/REPO/actions/workflows/deploy.yml/badge.svg)
-![Test](https://github.com/USERNAME/REPO/actions/workflows/test.yml/badge.svg)
-```
-
-## 🎯 Common Tasks
-
-### Manual Deployment
-```bash
-# GitHub → Actions → Deploy to DigitalOcean Droplet → Run workflow
-```
-
-### View Deployment Logs
-```bash
-ssh deploy@YOUR_DROPLET_IP
-cd /opt/strapi-app
-docker-compose logs -f
-```
-
-### Rollback Deployment
-```bash
-ssh deploy@YOUR_DROPLET_IP
-cd /opt/strapi-app
-git reset --hard HEAD~1
 docker-compose down
-docker-compose up -d --build
+docker-compose up -d
 ```
 
-### Update Secrets
-```bash
-# GitHub → Settings → Secrets and variables → Actions → Update
-```
+## 📁 Files
+
+| File | Purpose |
+|------|---------|
+| `.github/workflows/deploy.yml` | Build, push, and deploy workflow |
+| `docker-compose.prod.yml` | Production config (uses Docker Hub images) |
+| `docker-compose.yml` | Development config (builds locally) |
+
+## 🎯 Workflow Triggers
+
+| Event | Action |
+|-------|--------|
+| Push to `main` | Build → Push to Docker Hub → Deploy |
+| Pull Request | Run tests only |
+| Manual | GitHub Actions → Run workflow |
+
+## ✅ Verification Checklist
+
+- [ ] Docker Hub token added to GitHub Secrets
+- [ ] SSH key added to GitHub Secrets and Droplet
+- [ ] `docker-compose.prod.yml` copied to `docker-compose.yml` on Droplet
+- [ ] Git configured on Droplet
+- [ ] Workflow pushed to GitHub
+- [ ] Deployment successful
+- [ ] Images visible on Docker Hub
+- [ ] Website accessible
 
 ---
 
-**Full Documentation:** [CICD_SETUP.md](../CICD_SETUP.md)
+**Full Guide:** [Setup Workflow](./.agent/workflows/setup-github-actions-cicd.md)

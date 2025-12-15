@@ -1,36 +1,61 @@
 # GitHub Actions CI/CD Setup Guide
 
-Complete guide to set up automated deployment to your DigitalOcean Droplet using GitHub Actions.
+Complete guide to set up automated deployment using GitHub Actions and Docker Hub.
 
 ## 📋 Overview
 
 This setup enables:
 
 - ✅ **Automatic deployment** when you push to `main` branch
+- ✅ **Docker Hub integration** - Images built on GitHub, pulled on Droplet
 - ✅ **Automated testing** on pull requests
-- ✅ **Docker image building** and validation
 - ✅ **Security scanning** with Trivy
 - ✅ **Database backups** before each deployment
 - ✅ **Automatic rollback** if deployment fails
+- ✅ **Version tagging** with commit SHA
 
-## 🚀 Quick Setup (5 minutes)
+## 🐳 How It Works
 
-### Step 1: Generate SSH Key for GitHub Actions
+**Traditional Approach (Slow):**
+```
+Push code → Droplet builds images → Deploy
+(5-10 minutes, uses Droplet resources)
+```
+
+**Docker Hub Approach (Fast):**
+```
+Push code → GitHub builds images → Push to Docker Hub → Droplet pulls images → Deploy
+(3-5 minutes, Droplet just pulls pre-built images)
+```
+
+**Your Docker Hub Images:**
+- Backend: `friendy21/strapi-starter-backend:latest`
+- Frontend: `friendy21/strapi-starter-frontend:latest`
+
+## 🚀 Quick Setup (10 minutes)
+
+### Step 1: Configure Docker Hub Token
+
+You already have your Docker Hub credentials:
+- **Username:** `friendy21`
+- **Token:** `YOUR_DOCKER_HUB_TOKEN` (the one you generated)
+
+### Step 2: Generate SSH Key for GitHub Actions
 
 **On your local machine:**
 
 ```bash
 # Generate a dedicated SSH key for GitHub Actions
-ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions
+ssh-keygen -t ed25519 -C "github-actions" -f ~/.ssh/github-actions-deploy
 
 # Display the private key (you'll add this to GitHub)
-cat ~/.ssh/github-actions
+cat ~/.ssh/github-actions-deploy
 
 # Display the public key (you'll add this to your Droplet)
-cat ~/.ssh/github-actions.pub
+cat ~/.ssh/github-actions-deploy.pub
 ```
 
-### Step 2: Add Public Key to Your Droplet
+### Step 3: Add Public Key to Your Droplet
 
 **SSH into your Droplet:**
 
@@ -45,18 +70,20 @@ chmod 600 ~/.ssh/authorized_keys
 chmod 700 ~/.ssh
 ```
 
-### Step 3: Configure GitHub Secrets
+### Step 4: Configure GitHub Secrets
 
 1. Go to your GitHub repository
 2. Click **Settings** → **Secrets and variables** → **Actions**
 3. Click **New repository secret**
-4. Add these three secrets:
+4. Add these **5 secrets**:
 
 | Secret Name | Value | Example |
 |-------------|-------|---------|
-| `DROPLET_SSH_KEY` | Private key from Step 1 | Contents of `~/.ssh/github-actions` |
+| `DOCKER_HUB_TOKEN` | Docker Hub access token | `YOUR_DOCKER_HUB_TOKEN` |
+| `DROPLET_SSH_KEY` | Private key from Step 2 | Contents of `~/.ssh/github-actions-deploy` |
 | `DROPLET_IP` | Your Droplet's IP address | `164.92.123.45` |
 | `DROPLET_USER` | SSH username on Droplet | `deploy` |
+| `NEXT_PUBLIC_STRAPI_URL` | Public Strapi URL | `https://yourdomain.com` |
 
 **How to add secrets:**
 
