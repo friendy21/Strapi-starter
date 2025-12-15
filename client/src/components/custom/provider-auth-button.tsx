@@ -20,10 +20,11 @@ export function ProviderAuthLink({
 }) {
   const backendUrl = getStrapiURL();
   const path = "/api/connect/" + providerName;
-  const url = new URL(backendUrl + path);
+  // Handle empty URL during Docker build - use relative path as fallback
+  const href = backendUrl ? `${backendUrl}${path}` : path;
 
   return (
-    <Link href={url.href} className={cn(buttonVariants({ variant: "outline" }), "flex items-center w-full justify-center")} >
+    <Link href={href} className={cn(buttonVariants({ variant: "outline" }), "flex items-center w-full justify-center")} >
       {children}
       <span className="ml-4 text-sm font-semibold leading-6">{buttonText}</span>
     </Link>
