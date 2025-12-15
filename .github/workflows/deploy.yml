@@ -99,6 +99,47 @@ jobs:
           scp docker-compose.prod.yml $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/docker-compose.yml
           scp -r nginx $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/ || echo "⚠️ nginx folder not found, skipping"
 
+      - name: Setup Environment on Droplet
+        env:
+          DROPLET_IP: ${{ secrets.DROPLET_IP }}
+          DROPLET_USER: ${{ secrets.DROPLET_USER }}
+        run: |
+          echo "🔧 Setting up environment variables on Droplet..."
+          ssh $DROPLET_USER@$DROPLET_IP << 'ENDSSH'
+            cd ${{ env.DEPLOY_PATH }}
+            
+            # Create .env file if it doesn't exist
+            if [ ! -f .env ]; then
+              echo "🔑 Generating Strapi secrets..."
+              
+              # Generate secure random secrets
+              JWT_SECRET=$(openssl rand -base64 32)
+              ADMIN_JWT_SECRET=$(openssl rand -base64 32)
+              APP_KEYS=$(openssl rand -base64 32),$(openssl rand -base64 32),$(openssl rand -base64 32),$(openssl rand -base64 32)
+              API_TOKEN_SALT=$(openssl rand -base64 32)
+              TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
+              DB_PASSWORD=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9')
+              
+              cat > .env << EOF
+# Auto-generated Strapi production secrets
+DATABASE_USERNAME=strapi
+DATABASE_PASSWORD=${DB_PASSWORD}
+DATABASE_NAME=strapi
+
+JWT_SECRET=${JWT_SECRET}
+ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
+APP_KEYS=${APP_KEYS}
+API_TOKEN_SALT=${API_TOKEN_SALT}
+TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}
+
+NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)
+EOF
+              echo "✅ .env file created with generated secrets"
+            else
+              echo "ℹ️ .env file already exists, keeping existing secrets"
+            fi
+          ENDSSH
+
       - name: Deploy to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
