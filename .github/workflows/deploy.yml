@@ -133,6 +133,13 @@ jobs:
             echo "🛑 Stopping services..."
             docker-compose down || true
             
+            # Stop any existing nginx/apache using port 80
+            echo "🔌 Freeing up port 80..."
+            sudo systemctl stop nginx 2>/dev/null || true
+            sudo systemctl stop apache2 2>/dev/null || true
+            sudo fuser -k 80/tcp 2>/dev/null || true
+            sudo fuser -k 443/tcp 2>/dev/null || true
+            
             # Start services with new images (uses docker-compose.yml which is docker-compose.prod.yml)
             echo "🚀 Starting services with Docker Hub images..."
             docker-compose up -d
