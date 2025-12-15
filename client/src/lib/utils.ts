@@ -6,7 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getStrapiURL() {
-  return process.env.STRAPI_BASE_URL ?? "http://localhost:1337";
+  // During Docker build, SKIP_STATIC_GENERATION=true and STRAPI_BASE_URL is empty
+  // Return empty string to signal SDK should not initialize
+  if (process.env.SKIP_STATIC_GENERATION === 'true') {
+    return "";
+  }
+  // At runtime or local dev, use the actual URL or fallback to localhost
+  return process.env.STRAPI_BASE_URL || "http://localhost:1337";
 }
 
 export function getStrapiMedia(url: string | null) {
