@@ -80,12 +80,14 @@ jobs:
             
             echo "🗑️ Force removing ALL containers and volumes..."
             docker-compose down -v 2>/dev/null || true
-            docker rm -f strapi-backend strapi-postgres 2>/dev/null || true
+            docker rm -f strapi-backend strapi-postgres strapi-nginx strapi-frontend 2>/dev/null || true
+            docker stop $(docker ps -q) 2>/dev/null || true
             docker volume rm strapi-app_postgres_data 2>/dev/null || true
             docker volume prune -f 2>/dev/null || true
             
             echo "🔌 Freeing port 80..."
             sudo systemctl stop nginx 2>/dev/null || true
+            sudo systemctl disable nginx 2>/dev/null || true
             sudo fuser -k 80/tcp 2>/dev/null || true
             
             echo "🚀 Starting Strapi..."
