@@ -209,6 +209,20 @@ jobs:
             echo "📝 Environment file exists and has content:"
             ls -la .env 2>/dev/null || echo "No .env file found!"
             
+            # Check system resources
+            echo "💻 System resources:"
+            free -h
+            df -h /
+            
+            # Check firewall status
+            echo "🔥 Firewall status:"
+            sudo ufw status 2>/dev/null || echo "UFW not installed or not running"
+            
+            # Test internal connectivity
+            echo "🔌 Testing internal container connectivity:"
+            docker exec strapi-nginx curl -s http://strapi:1337/admin 2>/dev/null && echo "✅ Nginx can reach Strapi" || echo "❌ Nginx cannot reach Strapi"
+            docker exec strapi-nginx curl -s http://nextjs:3000 2>/dev/null && echo "✅ Nginx can reach Next.js" || echo "❌ Nginx cannot reach Next.js"
+            
             # Check if services are running
             if docker-compose ps | grep -q "Up"; then
               echo "✅ Containers are running"
@@ -216,6 +230,10 @@ jobs:
               # Show Strapi logs again
               echo "📋 Final Strapi logs:"
               docker-compose logs --tail=50 strapi || docker logs --tail=50 strapi-backend 2>/dev/null
+              
+              # Test Strapi directly
+              echo "🧪 Testing Strapi health endpoint:"
+              curl -s http://localhost:1337/_health 2>/dev/null || echo "Strapi health check failed on localhost"
             else
               echo "❌ Deployment failed!"
               docker-compose logs
