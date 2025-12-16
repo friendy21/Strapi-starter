@@ -93,14 +93,20 @@ jobs:
             echo "🚀 Starting Strapi..."
             docker-compose up -d
             
-            echo "⏳ Waiting 30 seconds..."
-            sleep 30
+            echo "⏳ Waiting 60 seconds for Strapi to fully start..."
+            sleep 60
             
             echo "📊 Container status:"
             docker-compose ps
             
-            echo "📋 Strapi logs:"
-            docker-compose logs strapi --tail=30
+            echo "📋 Full Strapi logs:"
+            docker-compose logs strapi
+            
+            echo "🔍 Testing PostgreSQL connection:"
+            docker exec strapi-postgres psql -U strapi -c "SELECT 1" || echo "PostgreSQL not accessible"
+            
+            echo "🔍 Checking admin_users table:"
+            docker exec strapi-postgres psql -U strapi -c "SELECT email FROM admin_users LIMIT 5" 2>/dev/null || echo "No admin_users table yet"
             
             echo "✅ Done!"
           ENDSSH
