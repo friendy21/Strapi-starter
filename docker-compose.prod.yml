@@ -1,36 +1,14 @@
 version: '3.8'
 
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: strapi-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: strapi
-      POSTGRES_PASSWORD: strapipassword123
-      POSTGRES_DB: strapi
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    networks:
-      - strapi-network
-    healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U strapi" ]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   strapi:
     image: friendy21/strapi-starter-backend:latest
     container_name: strapi-backend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      DATABASE_CLIENT: postgres
-      DATABASE_HOST: postgres
-      DATABASE_PORT: 5432
-      DATABASE_NAME: strapi
-      DATABASE_USERNAME: strapi
-      DATABASE_PASSWORD: strapipassword123
+      DATABASE_CLIENT: sqlite
+      DATABASE_FILENAME: /app/.tmp/data.db
       JWT_SECRET: mysupersecretjwtkey123456789012
       ADMIN_JWT_SECRET: myadminjwtsecretkey123456789012
       APP_KEYS: key1abcdefghijklmnop,key2abcdefghijklmnop
@@ -40,15 +18,8 @@ services:
       PORT: 1337
     ports:
       - "80:1337"
-    networks:
-      - strapi-network
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-networks:
-  strapi-network:
-    driver: bridge
+    volumes:
+      - strapi_data:/app/.tmp
 
 volumes:
-  postgres_data:
+  strapi_data:

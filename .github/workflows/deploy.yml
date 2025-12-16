@@ -90,25 +90,19 @@ jobs:
             sudo systemctl disable nginx 2>/dev/null || true
             sudo fuser -k 80/tcp 2>/dev/null || true
             
-            echo "🚀 Starting Strapi..."
+            echo "🚀 Starting Strapi with SQLite..."
             docker-compose up -d
             
-            echo "⏳ Waiting 60 seconds for Strapi to fully start..."
-            sleep 60
+            echo "⏳ Waiting 45 seconds for Strapi to fully start..."
+            sleep 45
             
             echo "📊 Container status:"
             docker-compose ps
             
-            echo "📋 Full Strapi logs:"
-            docker-compose logs strapi
+            echo "📋 Strapi logs:"
+            docker-compose logs strapi --tail=50
             
-            echo "🔍 Testing PostgreSQL connection:"
-            docker exec strapi-postgres psql -U strapi -c "SELECT 1" || echo "PostgreSQL not accessible"
-            
-            echo "🔍 Checking admin_users table:"
-            docker exec strapi-postgres psql -U strapi -c "SELECT email FROM admin_users LIMIT 5" 2>/dev/null || echo "No admin_users table yet"
-            
-            echo "✅ Done!"
+            echo "✅ Done! Access http://$(curl -s ifconfig.me)/admin"
           ENDSSH
 
       - name: Verify Deployment
