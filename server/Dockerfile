@@ -7,10 +7,10 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install all dependencies (including dev for TypeScript compilation)
-RUN npm ci --legacy-peer-deps
+# Install ALL dependencies (including devDependencies for TypeScript)
+RUN npm ci
 
-# Rebuild the source code only when needed
+# Build stage
 FROM base AS builder
 WORKDIR /app
 
@@ -18,22 +18,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build arguments for environment variables
+# Build arguments
 ARG NODE_ENV=production
 ARG DATABASE_CLIENT=postgres
 
 ENV NODE_ENV=${NODE_ENV}
 ENV DATABASE_CLIENT=${DATABASE_CLIENT}
 
-# Compile TypeScript config and src files
-RUN npx tsc --project tsconfig.json || echo "TypeScript compilation done"
-
-# Build the Strapi admin panel
+# Build the Strapi admin (this handles TypeScript internally)
 RUN npm run build
-
-# Debug: Show what was built
-RUN echo "=== Contents of dist ===" && ls -la dist/ || echo "No dist folder"
-RUN echo "=== Contents of dist/config ===" && ls -la dist/config/ || echo "No dist/config folder"
 
 # Production image
 FROM base AS runner
@@ -45,26 +38,22 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 strapi
 
-# Copy package files and node_modules
+# Copy package files
 COPY --from=builder /app/package*.json ./
+
+# Copy node_modules (need all deps including TypeScript for runtime)
 COPY --from=builder /app/node_modules ./node_modules
 
-# Copy public folder
+# Copy source files - Strapi runs from these with TypeScript support
+COPY --from=builder /app/config ./config
+COPY --from=builder /app/src ./src
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/database ./database
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 COPY --from=builder /app/favicon.png ./favicon.png
 
-# Copy the ENTIRE dist folder (contains build, config, src)
+# Copy the built admin panel (from dist/build)
 COPY --from=builder /app/dist ./dist
-
-# Strapi expects config/ and src/ at root - copy compiled versions there
-COPY --from=builder /app/dist/config ./config
-COPY --from=builder /app/dist/src ./src
-
-# Copy admin build - Strapi looks for this in dist/build
-# (already in dist from above, but let's be explicit)
-
-# Copy database folder for migrations if exists
-COPY --from=builder /app/database ./database
 
 # Set ownership
 RUN chown -R strapi:nodejs /app
@@ -73,4 +62,5 @@ USER strapi
 
 EXPOSE 1337
 
+# Start Strapi - it will use TypeScript files directly
 CMD ["npm", "run", "start"]
