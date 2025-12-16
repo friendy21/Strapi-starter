@@ -1,7 +1,6 @@
 version: '3.8'
 
 # Production Docker Compose - Uses pre-built images from Docker Hub
-# Images are built and pushed by GitHub Actions CI/CD
 
 services:
   # PostgreSQL Database
@@ -10,20 +9,20 @@ services:
     container_name: strapi-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DATABASE_USERNAME:-strapi}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-strapi_password}
-      POSTGRES_DB: ${DATABASE_NAME:-strapi}
+      POSTGRES_USER: strapi
+      POSTGRES_PASSWORD: strapipassword123
+      POSTGRES_DB: strapi
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - strapi-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-strapi}" ]
+      test: [ "CMD-SHELL", "pg_isready -U strapi" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # Strapi Backend (from Docker Hub)
+  # Strapi Backend
   strapi:
     image: friendy21/strapi-starter-backend:latest
     container_name: strapi-backend
@@ -33,14 +32,14 @@ services:
       DATABASE_CLIENT: postgres
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_NAME: ${DATABASE_NAME:-strapi}
-      DATABASE_USERNAME: ${DATABASE_USERNAME:-strapi}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-strapi_password}
-      JWT_SECRET: ${JWT_SECRET}
-      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
-      APP_KEYS: ${APP_KEYS}
-      API_TOKEN_SALT: ${API_TOKEN_SALT}
-      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+      DATABASE_NAME: strapi
+      DATABASE_USERNAME: strapi
+      DATABASE_PASSWORD: strapipassword123
+      JWT_SECRET: ${JWT_SECRET:-defaultjwtsecret123456789012345678}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET:-defaultadminjwtsecret1234567890}
+      APP_KEYS: ${APP_KEYS:-key1base64string,key2base64string}
+      API_TOKEN_SALT: ${API_TOKEN_SALT:-defaultapisalt123456789012345678}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT:-defaulttransfersalt12345678}
       HOST: 0.0.0.0
       PORT: 1337
     volumes:
@@ -51,14 +50,14 @@ services:
       postgres:
         condition: service_healthy
 
-  # Next.js Frontend (from Docker Hub)
+  # Next.js Frontend
   nextjs:
     image: friendy21/strapi-starter-frontend:latest
     container_name: strapi-frontend
     restart: unless-stopped
     environment:
       NODE_ENV: production
-      STRAPI_BASE_URL: http://strapi:1337
+      NEXT_PUBLIC_STRAPI_URL: http://strapi:1337
     networks:
       - strapi-network
     depends_on:
@@ -71,25 +70,13 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"
-      - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
-      - certbot_webroot:/var/www/certbot:ro
     networks:
       - strapi-network
     depends_on:
       - strapi
       - nextjs
-
-  # Certbot for SSL (optional)
-  certbot:
-    image: certbot/certbot
-    container_name: strapi-certbot
-    volumes:
-      - ./nginx/ssl:/etc/letsencrypt
-      - certbot_webroot:/var/www/certbot
-    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
 
 networks:
   strapi-network:
@@ -98,4 +85,3 @@ networks:
 volumes:
   postgres_data:
   strapi_uploads:
-  certbot_webroot:
