@@ -7,7 +7,7 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
+# Install dependencies  
 RUN npm ci --legacy-peer-deps
 
 # Rebuild the source code only when needed
@@ -25,10 +25,10 @@ ARG DATABASE_CLIENT=postgres
 ENV NODE_ENV=${NODE_ENV}
 ENV DATABASE_CLIENT=${DATABASE_CLIENT}
 
-# First compile TypeScript to JavaScript
+# Compile TypeScript to JavaScript first
 RUN npx tsc --project tsconfig.json || echo "TypeScript compilation completed"
 
-# Then build the Strapi admin
+# Build the Strapi admin panel
 RUN npm run build
 
 # Production image
@@ -41,21 +41,14 @@ ENV NODE_ENV=production
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 strapi
 
-# Copy built files - dist contains compiled code and admin build
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
+# Copy everything Strapi needs to run
 COPY --from=builder /app/package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/public ./public
+COPY --from=builder /app/favicon.png ./favicon.png
 
-# Copy admin panel build from dist/build to root build folder (where Strapi expects it)
-COPY --from=builder /app/dist/build ./build
-
-# Copy compiled config and src from dist folder
-COPY --from=builder /app/dist/config ./config
-COPY --from=builder /app/dist/src ./src
-
-# Also copy database folder if it has migrations
-COPY --from=builder /app/database ./database
+# Copy the dist folder (compiled TypeScript)
+COPY --from=builder /app/dist ./dist
 
 # Set ownership
 RUN chown -R strapi:nodejs /app
@@ -64,4 +57,5 @@ USER strapi
 
 EXPOSE 1337
 
+# Use strapi start which knows where to find compiled files
 CMD ["npm", "run", "start"]
