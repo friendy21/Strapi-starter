@@ -47,6 +47,10 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/public ./public
 
+# Copy Strapi admin build output (.cache contains the built admin panel)
+COPY --from=builder /app/.cache ./.cache
+COPY --from=builder /app/build ./build
+
 # Copy compiled config and src from dist folder
 COPY --from=builder /app/dist/config ./config
 COPY --from=builder /app/dist/src ./src
