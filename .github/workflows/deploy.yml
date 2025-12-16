@@ -173,6 +173,13 @@ jobs:
             docker pull ${{ env.STRAPI_IMAGE }}:latest
             docker pull ${{ env.NEXTJS_IMAGE }}:latest
             
+            # ONE-TIME FIX: Delete .env to regenerate with fresh credentials
+            # This ensures the new .env matches the new database
+            # (Remove this section after successful deployment!)
+            echo "🔄 One-time reset: syncing database and credentials..."
+            rm -f .env
+            docker volume rm strapi-app_postgres_data 2>/dev/null || true
+            
             # Stop services (keep volumes to preserve database!)
             echo "🛑 Stopping services..."
             docker-compose down || true
