@@ -108,39 +108,41 @@ jobs:
           ssh $DROPLET_USER@$DROPLET_IP 'bash -s' << 'ENDSSH'
             cd /opt/strapi-app
             
-            # Only create .env if it doesn't exist (preserve existing secrets!)
-            if [ ! -f .env ]; then
-              echo "🔑 Generating Strapi secrets for first deployment..."
-              
-              # Generate secure random secrets
-              JWT_SECRET=$(openssl rand -base64 32)
-              ADMIN_JWT_SECRET=$(openssl rand -base64 32)
-              APP_KEY1=$(openssl rand -base64 32)
-              APP_KEY2=$(openssl rand -base64 32)
-              APP_KEY3=$(openssl rand -base64 32)
-              APP_KEY4=$(openssl rand -base64 32)
-              API_TOKEN_SALT=$(openssl rand -base64 32)
-              TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
-              DB_PASSWORD=$(openssl rand -base64 16 | tr -d '/+=' | head -c 16)
-              
-              # Create .env file
-              echo "# Auto-generated Strapi production secrets" > .env
-              echo "DATABASE_USERNAME=strapi" >> .env
-              echo "DATABASE_PASSWORD=${DB_PASSWORD}" >> .env
-              echo "DATABASE_NAME=strapi" >> .env
-              echo "" >> .env
-              echo "JWT_SECRET=${JWT_SECRET}" >> .env
-              echo "ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}" >> .env
-              echo "APP_KEYS=${APP_KEY1},${APP_KEY2},${APP_KEY3},${APP_KEY4}" >> .env
-              echo "API_TOKEN_SALT=${API_TOKEN_SALT}" >> .env
-              echo "TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}" >> .env
-              echo "" >> .env
-              echo "NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)" >> .env
-              
-              echo "✅ .env file created with new secrets"
-            else
-              echo "ℹ️ .env file exists - keeping existing secrets for database persistence"
-            fi
+            # ALWAYS generate fresh .env for clean database reset
+            echo "🔑 Generating fresh Strapi secrets..."
+            
+            # Use a FIXED simple password for now to debug
+            DB_PASSWORD="strapipassword123"
+            
+            # Generate other secrets
+            JWT_SECRET=$(openssl rand -base64 32)
+            ADMIN_JWT_SECRET=$(openssl rand -base64 32)
+            APP_KEY1=$(openssl rand -base64 32)
+            APP_KEY2=$(openssl rand -base64 32)
+            API_TOKEN_SALT=$(openssl rand -base64 32)
+            TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
+            
+            # Create fresh .env file
+            cat > .env << EOF
+# Auto-generated Strapi production secrets
+DATABASE_HOST=postgres
+DATABASE_PORT=5432
+DATABASE_NAME=strapi
+DATABASE_USERNAME=strapi
+DATABASE_PASSWORD=${DB_PASSWORD}
+DATABASE_CLIENT=postgres
+
+JWT_SECRET=${JWT_SECRET}
+ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
+APP_KEYS=${APP_KEY1},${APP_KEY2}
+API_TOKEN_SALT=${API_TOKEN_SALT}
+TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}
+
+NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)
+EOF
+            
+            echo "✅ Fresh .env file created"
+            cat .env | head -10
           ENDSSH
 
       - name: Deploy to Droplet
@@ -174,15 +176,11 @@ jobs:
             docker pull ${{ env.NEXTJS_IMAGE }}:latest
             
             # COMPLETE DATABASE RESET - Stop everything first
-            echo "🔄 Complete database reset - stopping all containers..."
+            echo "🔄 Stopping all containers for fresh start..."
             docker-compose down || true
             
-            # Delete .env to force regeneration with fresh credentials
-            echo "🗑️ Deleting old .env file..."
-            rm -f .env
-            
-            # Remove ALL volumes to ensure fresh database
-            echo "🗑️ Removing all Docker volumes..."
+            # Remove ALL volumes to ensure fresh database with matching credentials
+            echo "🗑️ Removing Docker volumes for fresh database..."
             docker volume rm strapi-app_postgres_data 2>/dev/null || true
             docker volume rm strapi-app_strapi_uploads 2>/dev/null || true
             
