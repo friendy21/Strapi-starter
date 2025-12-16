@@ -104,17 +104,12 @@ jobs:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          echo "🔧 Setting up environment variables on Droplet..."
+          echo "🔧 Setting up environment on Droplet..."
           ssh $DROPLET_USER@$DROPLET_IP 'bash -s' << 'ENDSSH'
             cd /opt/strapi-app
             
-            # ALWAYS generate fresh .env for clean database reset
-            echo "🔑 Generating fresh Strapi secrets..."
+            echo "🔑 Generating fresh .env file..."
             
-            # Use a FIXED simple password for now to debug
-            DB_PASSWORD="strapipassword123"
-            
-            # Generate other secrets
             JWT_SECRET=$(openssl rand -base64 32)
             ADMIN_JWT_SECRET=$(openssl rand -base64 32)
             APP_KEY1=$(openssl rand -base64 32)
@@ -122,27 +117,20 @@ jobs:
             API_TOKEN_SALT=$(openssl rand -base64 32)
             TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
             
-            # Create fresh .env file
-            cat > .env << EOF
-# Auto-generated Strapi production secrets
-DATABASE_HOST=postgres
-DATABASE_PORT=5432
-DATABASE_NAME=strapi
-DATABASE_USERNAME=strapi
-DATABASE_PASSWORD=${DB_PASSWORD}
-DATABASE_CLIENT=postgres
-
-JWT_SECRET=${JWT_SECRET}
-ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET}
-APP_KEYS=${APP_KEY1},${APP_KEY2}
-API_TOKEN_SALT=${API_TOKEN_SALT}
-TRANSFER_TOKEN_SALT=${TRANSFER_TOKEN_SALT}
-
-NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)
-EOF
+            echo "DATABASE_HOST=postgres" > .env
+            echo "DATABASE_PORT=5432" >> .env
+            echo "DATABASE_NAME=strapi" >> .env
+            echo "DATABASE_USERNAME=strapi" >> .env
+            echo "DATABASE_PASSWORD=strapipassword123" >> .env
+            echo "DATABASE_CLIENT=postgres" >> .env
+            echo "JWT_SECRET=$JWT_SECRET" >> .env
+            echo "ADMIN_JWT_SECRET=$ADMIN_JWT_SECRET" >> .env
+            echo "APP_KEYS=$APP_KEY1,$APP_KEY2" >> .env
+            echo "API_TOKEN_SALT=$API_TOKEN_SALT" >> .env
+            echo "TRANSFER_TOKEN_SALT=$TRANSFER_TOKEN_SALT" >> .env
+            echo "NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)" >> .env
             
-            echo "✅ Fresh .env file created"
-            cat .env | head -10
+            echo "✅ .env file created"
           ENDSSH
 
       - name: Deploy to Droplet
