@@ -32,12 +32,12 @@ export default {
           await adminService.create({
             firstname: 'Rahul',
             lastname: 'Sinha',
-            email: 'rahul.sinha@acumen-labs.com',
+            email: 'rahul.sinha@acumen-strategy.com',
             password: 'Springercapital@123',
             isActive: true,
             roles: [superAdminRole.id]
           });
-          console.log('✅ Superadmin created: rahul.sinha@acumen-labs.com');
+          console.log('✅ Superadmin created: rahul.sinha@acumen-strategy.com');
         }
       } else {
         console.log('ℹ️ Admin user already exists, skipping creation');
