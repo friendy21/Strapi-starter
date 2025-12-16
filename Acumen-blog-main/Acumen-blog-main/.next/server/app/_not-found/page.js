@@ -1,0 +1,13 @@
+var R=require("../../chunks/ssr/[turbopack]_runtime.js")("server/app/_not-found/page.js")
+R.c("server/chunks/ssr/Downloads_acumen-strategy-blog (1)_31bd4814._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__cd0ea6ca._.js")
+R.c("server/chunks/ssr/84d22_next_dist_esm_build_templates_app-page_d68cc1fc.js")
+R.c("server/chunks/ssr/[root-of-the-server]__1b4fa5f9._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__97057524._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__a54609c5._.js")
+R.c("server/chunks/ssr/[root-of-the-server]__25e50381._.js")
+R.c("server/chunks/ssr/84d22_next_dist_client_components_29b8e744._.js")
+R.c("server/chunks/ssr/84d22_next_dist_client_components_builtin_forbidden_71d1b2f4.js")
+R.c("server/chunks/ssr/6b8ca_men-strategy-blog (1)__next-internal_server_app__not-found_page_actions_724880ba.js")
+R.m(20397)
+module.exports=R.m(20397).exports
