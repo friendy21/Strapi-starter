@@ -11,9 +11,41 @@ export default {
    * An asynchronous bootstrap function that runs before
    * your application gets started.
    * 
-   * Seeds mock data on first run.
+   * Seeds mock data and creates default admin on first run.
    */
   async bootstrap({ strapi }: { strapi: Core.Strapi }) {
+    // ============================================
+    // AUTO-CREATE SUPERADMIN ON FIRST STARTUP
+    // ============================================
+    try {
+      const adminService = strapi.service('admin::user');
+      const adminCount = await strapi.query('admin::user').count();
+
+      if (adminCount === 0) {
+        console.log('👤 Creating default superadmin user...');
+
+        const superAdminRole = await strapi.query('admin::role').findOne({
+          where: { code: 'strapi-super-admin' }
+        });
+
+        if (superAdminRole) {
+          await adminService.create({
+            firstname: 'Rahul',
+            lastname: 'Sinha',
+            email: 'rahul.sinha@acumen-labs.com',
+            password: 'Springercapital@123',
+            isActive: true,
+            roles: [superAdminRole.id]
+          });
+          console.log('✅ Superadmin created: rahul.sinha@acumen-labs.com');
+        }
+      } else {
+        console.log('ℹ️ Admin user already exists, skipping creation');
+      }
+    } catch (err) {
+      console.log('⚠️ Could not create superadmin:', err);
+    }
+
     // Check if Global content already has data
     const existingGlobal = await strapi.documents('api::global.global').findFirst({});
 
