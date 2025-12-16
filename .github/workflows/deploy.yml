@@ -1,20 +1,19 @@
-name: Deploy to DigitalOcean via Docker Hub
+name: Deploy Strapi to DigitalOcean
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
 
 env:
   DOCKER_USERNAME: friendy21
   STRAPI_IMAGE: friendy21/strapi-starter-backend
-  NEXTJS_IMAGE: friendy21/strapi-starter-frontend
   DEPLOY_PATH: /opt/strapi-app
 
 jobs:
   build-and-push:
-    name: Build and Push to Docker Hub
+    name: Build and Push Strapi
     runs-on: ubuntu-latest
     
     steps:
@@ -30,46 +29,15 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Extract version tag
-        id: meta
-        run: |
-          # Use commit SHA as tag
-          echo "tag=sha-${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-          echo "date=$(date +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
-
       - name: Build and push Strapi image
         uses: docker/build-push-action@v5
         with:
           context: ./server
           file: ./server/Dockerfile
           push: true
-          tags: |
-            ${{ env.STRAPI_IMAGE }}:latest
-            ${{ env.STRAPI_IMAGE }}:${{ steps.meta.outputs.tag }}
+          tags: ${{ env.STRAPI_IMAGE }}:latest
           cache-from: type=registry,ref=${{ env.STRAPI_IMAGE }}:buildcache
           cache-to: type=registry,ref=${{ env.STRAPI_IMAGE }}:buildcache,mode=max
-
-      - name: Build and push Next.js image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./client
-          file: ./client/Dockerfile
-          push: true
-          build-args: |
-            NEXT_PUBLIC_STRAPI_URL=${{ secrets.NEXT_PUBLIC_STRAPI_URL }}
-            STRAPI_BASE_URL=http://strapi:1337
-          tags: |
-            ${{ env.NEXTJS_IMAGE }}:latest
-            ${{ env.NEXTJS_IMAGE }}:${{ steps.meta.outputs.tag }}
-          cache-from: type=registry,ref=${{ env.NEXTJS_IMAGE }}:buildcache
-          cache-to: type=registry,ref=${{ env.NEXTJS_IMAGE }}:buildcache,mode=max
-
-      - name: Image build summary
-        run: |
-          echo "✅ Images built and pushed successfully!"
-          echo "Strapi: ${{ env.STRAPI_IMAGE }}:latest"
-          echo "Next.js: ${{ env.NEXTJS_IMAGE }}:latest"
-          echo "Tag: ${{ steps.meta.outputs.tag }}"
 
   deploy:
     name: Deploy to Droplet
@@ -81,228 +49,63 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.DROPLET_SSH_KEY }}
-
-      - name: Add Droplet to known hosts
         run: |
           mkdir -p ~/.ssh
+          echo "${{ secrets.DROPLET_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.DROPLET_IP }} >> ~/.ssh/known_hosts
 
-      - name: Copy docker-compose.prod.yml to Droplet
+      - name: Copy docker-compose to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
         run: |
-          echo "📄 Copying docker-compose.prod.yml to Droplet..."
-          scp docker-compose.prod.yml $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/docker-compose.yml
-          scp -r nginx $DROPLET_USER@$DROPLET_IP:${{ env.DEPLOY_PATH }}/ || echo "⚠️ nginx folder not found, skipping"
-
-      - name: Setup Environment on Droplet
-        env:
-          DROPLET_IP: ${{ secrets.DROPLET_IP }}
-          DROPLET_USER: ${{ secrets.DROPLET_USER }}
-        run: |
-          echo "🔧 Setting up environment on Droplet..."
-          ssh $DROPLET_USER@$DROPLET_IP 'bash -s' << 'ENDSSH'
-            cd /opt/strapi-app
-            
-            echo "🔑 Generating fresh .env file..."
-            
-            JWT_SECRET=$(openssl rand -base64 32)
-            ADMIN_JWT_SECRET=$(openssl rand -base64 32)
-            APP_KEY1=$(openssl rand -base64 32)
-            APP_KEY2=$(openssl rand -base64 32)
-            API_TOKEN_SALT=$(openssl rand -base64 32)
-            TRANSFER_TOKEN_SALT=$(openssl rand -base64 32)
-            
-            echo "DATABASE_HOST=postgres" > .env
-            echo "DATABASE_PORT=5432" >> .env
-            echo "DATABASE_NAME=strapi" >> .env
-            echo "DATABASE_USERNAME=strapi" >> .env
-            echo "DATABASE_PASSWORD=strapipassword123" >> .env
-            echo "DATABASE_CLIENT=postgres" >> .env
-            echo "JWT_SECRET=$JWT_SECRET" >> .env
-            echo "ADMIN_JWT_SECRET=$ADMIN_JWT_SECRET" >> .env
-            echo "APP_KEYS=$APP_KEY1,$APP_KEY2" >> .env
-            echo "API_TOKEN_SALT=$API_TOKEN_SALT" >> .env
-            echo "TRANSFER_TOKEN_SALT=$TRANSFER_TOKEN_SALT" >> .env
-            echo "NEXT_PUBLIC_STRAPI_URL=http://$(curl -s ifconfig.me)" >> .env
-            
-            echo "✅ .env file created"
-          ENDSSH
+          ssh $DROPLET_USER@$DROPLET_IP "mkdir -p /opt/strapi-app"
+          scp docker-compose.prod.yml $DROPLET_USER@$DROPLET_IP:/opt/strapi-app/docker-compose.yml
 
       - name: Deploy to Droplet
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
           DROPLET_USER: ${{ secrets.DROPLET_USER }}
-          DOCKER_USERNAME: ${{ env.DOCKER_USERNAME }}
         run: |
           ssh $DROPLET_USER@$DROPLET_IP << 'ENDSSH'
             set -e
+            cd /opt/strapi-app
             
-            echo "🚀 Starting deployment..."
-            
-            # Navigate to app directory
-            cd ${{ env.DEPLOY_PATH }}
-            
-            # Create directories if they don't exist
-            mkdir -p /opt/backups
-            
-            # Backup database before deployment
-            echo "💾 Creating database backup..."
-            docker exec strapi-postgres pg_dump -U strapi strapi > /opt/backups/pre-deploy-$(date +%Y%m%d_%H%M%S).sql || echo "⚠️ Backup failed, continuing..."
-            
-            # Login to Docker Hub
             echo "🔐 Logging into Docker Hub..."
-            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u ${{ env.DOCKER_USERNAME }} --password-stdin
+            echo "${{ secrets.DOCKER_HUB_TOKEN }}" | docker login -u friendy21 --password-stdin
             
-            # Pull latest images from Docker Hub
-            echo "📦 Pulling latest images from Docker Hub..."
-            docker pull ${{ env.STRAPI_IMAGE }}:latest
-            docker pull ${{ env.NEXTJS_IMAGE }}:latest
+            echo "📦 Pulling Strapi image..."
+            docker pull friendy21/strapi-starter-backend:latest
             
-            # COMPLETE DATABASE RESET - Stop everything first
-            echo "🔄 Stopping all containers for fresh start..."
-            docker-compose down || true
-            
-            # Remove ALL volumes to ensure fresh database with matching credentials
-            echo "🗑️ Removing Docker volumes for fresh database..."
+            echo "🗑️ Force removing ALL containers and volumes..."
+            docker-compose down -v 2>/dev/null || true
+            docker rm -f strapi-backend strapi-postgres 2>/dev/null || true
             docker volume rm strapi-app_postgres_data 2>/dev/null || true
-            docker volume rm strapi-app_strapi_uploads 2>/dev/null || true
+            docker volume prune -f 2>/dev/null || true
             
-            # Stop any existing nginx/apache using port 80
-            echo "🔌 Freeing up ports..."
+            echo "🔌 Freeing port 80..."
             sudo systemctl stop nginx 2>/dev/null || true
-            sudo systemctl stop apache2 2>/dev/null || true
             sudo fuser -k 80/tcp 2>/dev/null || true
-            sudo fuser -k 443/tcp 2>/dev/null || true
-            sudo fuser -k 8080/tcp 2>/dev/null || true
             
-            # Start services with new images (uses docker-compose.yml which is docker-compose.prod.yml)
-            echo "🚀 Starting services with Docker Hub images..."
+            echo "🚀 Starting Strapi..."
             docker-compose up -d
             
-            # Wait for PostgreSQL to be ready first
-            echo "⏳ Waiting for PostgreSQL to start..."
-            sleep 15
+            echo "⏳ Waiting 30 seconds..."
+            sleep 30
             
-            # Show container status
-            echo "📊 Container status after 15 seconds:"
+            echo "📊 Container status:"
             docker-compose ps
             
-            # Show Strapi logs
-            echo "📋 Strapi container logs:"
-            docker-compose logs strapi || docker logs strapi-backend 2>/dev/null || echo "No strapi logs available"
+            echo "📋 Strapi logs:"
+            docker-compose logs strapi --tail=30
             
-            # Wait more for Strapi to initialize
-            echo "⏳ Waiting 60 more seconds for Strapi to fully initialize..."
-            sleep 60
-            
-            # Show final status
-            echo "📊 Final container status:"
-            docker-compose ps
-            
-            # Test database connection
-            echo "🔍 Testing database connection..."
-            docker exec strapi-postgres pg_isready -U strapi || echo "❌ PostgreSQL not ready"
-            
-            # Show database credentials (masked password)
-            echo "🔐 Database credentials check:"
-            docker exec strapi-backend printenv | grep DATABASE || echo "No DATABASE env vars found"
-            
-            # Try to connect from Strapi container to PostgreSQL
-            echo "🔌 Testing Strapi -> PostgreSQL connection..."
-            docker exec strapi-backend sh -c 'nc -zv postgres 5432' || echo "❌ Cannot reach postgres:5432"
-            
-            
-            # Show .env file (masked)
-            echo "📝 Environment file exists and has content:"
-            ls -la .env 2>/dev/null || echo "No .env file found!"
-            
-            # Check system resources
-            echo "💻 System resources:"
-            free -h
-            df -h /
-            
-            # Check firewall status
-            echo "🔥 Firewall status:"
-            sudo ufw status 2>/dev/null || echo "UFW not installed or not running"
-            
-            # Test internal connectivity
-            echo "🔌 Testing internal container connectivity:"
-            docker exec strapi-nginx curl -s http://strapi:1337/admin 2>/dev/null && echo "✅ Nginx can reach Strapi" || echo "❌ Nginx cannot reach Strapi"
-            docker exec strapi-nginx curl -s http://nextjs:3000 2>/dev/null && echo "✅ Nginx can reach Next.js" || echo "❌ Nginx cannot reach Next.js"
-            
-            # Check if services are running
-            if docker-compose ps | grep -q "Up"; then
-              echo "✅ Containers are running"
-              
-              # Show Strapi logs again
-              echo "📋 Final Strapi logs:"
-              docker-compose logs --tail=50 strapi || docker logs --tail=50 strapi-backend 2>/dev/null
-              
-              # Test Strapi directly
-              echo "🧪 Testing Strapi health endpoint:"
-              curl -s http://localhost:1337/_health 2>/dev/null || echo "Strapi health check failed on localhost"
-            else
-              echo "❌ Deployment failed!"
-              docker-compose logs
-              exit 1
-            fi
-            
-            # Clean up old Docker images
-            echo "🧹 Cleaning up old images..."
-            docker image prune -f
-            
-            # Logout from Docker Hub
-            docker logout
-            
-            echo "🎉 Deployment complete!"
+            echo "✅ Done!"
           ENDSSH
 
       - name: Verify Deployment
         env:
           DROPLET_IP: ${{ secrets.DROPLET_IP }}
         run: |
-          echo "🔍 Verifying deployment..."
-          echo "⏳ Waiting 60 seconds for Strapi to fully initialize..."
-          sleep 60
-          
-          # Check if frontend is accessible
-          if curl -f -s -o /dev/null http://$DROPLET_IP; then
-            echo "✅ Frontend is accessible"
-          else
-            echo "❌ Frontend is not accessible"
-            exit 1
-          fi
-          
-          # Check if Strapi admin is accessible (with retry)
-          echo "🔍 Checking Strapi admin..."
-          for i in 1 2 3; do
-            if curl -f -s -o /dev/null http://$DROPLET_IP/admin; then
-              echo "✅ Strapi admin is accessible"
-              exit 0
-            fi
-            echo "⏳ Strapi not ready yet, retrying in 20 seconds... (attempt $i/3)"
-            sleep 20
-          done
-          echo "⚠️ Strapi admin check timed out - containers are running, admin may need more time to initialize"
-          echo "Check manually at: http://$DROPLET_IP/admin"
-
-      - name: Deployment Summary
-        if: success()
-        run: |
-          echo "🎉 Deployment completed successfully!"
-          echo "Images deployed:"
-          echo "  - Strapi: ${{ env.STRAPI_IMAGE }}:latest"
-          echo "  - Next.js: ${{ env.NEXTJS_IMAGE }}:latest"
-          echo "Access your application at: http://${{ secrets.DROPLET_IP }}"
-
-      - name: Notify on Failure
-        if: failure()
-        run: |
-          echo "❌ Deployment failed!"
-          echo "Check the logs above for details."
-
+          echo "Checking http://$DROPLET_IP/admin"
+          curl -s -o /dev/null -w "HTTP %{http_code}" http://$DROPLET_IP/admin || echo " - Strapi starting..."
