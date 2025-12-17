@@ -102,13 +102,42 @@ jobs:
             echo "🚀 Starting all services..."
             docker-compose up -d
             
-            echo "⏳ Waiting 45 seconds..."
-            sleep 45
+            echo "⏳ Waiting 60 seconds for Strapi to initialize database..."
+            sleep 60
             
             echo "📊 Container status:"
             docker-compose ps
             
-            echo "✅ Done!"
+            echo "👤 Creating super admin user..."
+            docker exec -i strapi-backend sqlite3 /app/.tmp/data.db <<'EOSQL'
+-- Clean up any failed attempts
+DELETE FROM admin_users WHERE email='rahul.sinha@acumen-strategy.com';
+
+-- Create admin user with bcrypt hashed password
+INSERT INTO admin_users (
+    firstname, lastname, email, password, 
+    is_active, blocked, created_at, updated_at
+) VALUES (
+    'Rahul', 
+    'Sinha', 
+    'rahul.sinha@acumen-strategy.com', 
+    '$2a$10$ruqA1glFKs5qsjc.MBR5be7dP3KVzUkluMPurpe9v7RaP1/75HO/2', 
+    1, 0, datetime('now'), datetime('now')
+);
+
+-- Assign Super Admin role
+INSERT INTO admin_users_roles_lnk (user_id, role_id)
+VALUES (
+    (SELECT id FROM admin_users WHERE email='rahul.sinha@acumen-strategy.com'), 
+    (SELECT id FROM admin_roles WHERE code='strapi-super-admin')
+);
+EOSQL
+            
+            echo "🔄 Restarting Strapi to recognize new admin..."
+            docker restart strapi-backend
+            sleep 10
+            
+            echo "✅ Done! Admin: rahul.sinha@acumen-strategy.com"
           ENDSSH
 
       - name: Verify Deployment
