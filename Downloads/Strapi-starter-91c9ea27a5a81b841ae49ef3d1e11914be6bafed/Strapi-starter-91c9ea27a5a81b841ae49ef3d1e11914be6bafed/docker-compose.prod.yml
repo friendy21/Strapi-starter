@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  strapi:
+    image: friendy21/strapi-starter-backend:latest
+    container_name: strapi-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_CLIENT: sqlite
+      DATABASE_FILENAME: /app/.tmp/data.db
+      JWT_SECRET: mysupersecretjwtkey123456789012
+      ADMIN_JWT_SECRET: myadminjwtsecretkey123456789012
+      APP_KEYS: key1abcdefghijklmnop,key2abcdefghijklmnop
+      API_TOKEN_SALT: apisaltabcdefghijklmnopqrstuvwx
+      TRANSFER_TOKEN_SALT: transfersaltabcdefghijklmnop
+      HOST: 0.0.0.0
+      PORT: 1337
+    volumes:
+      - strapi_data:/app/.tmp
+    networks:
+      - strapi-network
+
+  nextjs:
+    image: friendy21/strapi-starter-frontend:latest
+    container_name: strapi-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      # Empty for browser - uses relative paths through nginx (same origin)
+      NEXT_PUBLIC_STRAPI_URL: ""
+      # Internal Docker URL for server-side rendering
+      STRAPI_INTERNAL_URL: http://strapi:1337
+    networks:
+      - strapi-network
+    depends_on:
+      - strapi
+
+  nginx:
+    image: nginx:alpine
+    container_name: strapi-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - strapi-network
+    depends_on:
+      - strapi
+      - nextjs
+
+networks:
+  strapi-network:
+    driver: bridge
+
+volumes:
+  strapi_data:
