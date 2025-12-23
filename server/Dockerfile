@@ -12,13 +12,10 @@ RUN npm install
 COPY . .
 
 # Build environment
-ENV NODE_ENV=production
-
-# Build admin panel
-RUN npm run build
+ENV NODE_ENV=development
 
 # Expose port
 EXPOSE 1337
 
 # Start Strapi
-CMD ["npm", "run", "start"]
+CMD ["npm", "run", "develop"]
