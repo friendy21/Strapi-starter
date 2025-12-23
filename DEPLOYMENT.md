@@ -63,7 +63,8 @@ nano .env
 ```
 
 Update these values:
-- `DATABASE_PASSWORD` - Set a strong password
+- `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD` - Set strong, unique values
+- `APP_KEYS`, `JWT_SECRET`, `ADMIN_JWT_SECRET`, `API_TOKEN_SALT`, `TRANSFER_TOKEN_SALT` - Required secrets (replace all placeholders; generate with `openssl rand -base64 32`)
 - `NEXT_PUBLIC_STRAPI_URL` - Your domain (e.g., `https://yourdomain.com`)
 
 ### Step 5: Set Up SSL (Optional but Recommended)

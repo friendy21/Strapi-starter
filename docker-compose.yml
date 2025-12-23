@@ -7,15 +7,15 @@ services:
     container_name: strapi-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${DATABASE_USERNAME:-strapi}
-      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-strapi_password}
-      POSTGRES_DB: ${DATABASE_NAME:-strapi}
+      POSTGRES_USER: ${DATABASE_USERNAME?err}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD?err}
+      POSTGRES_DB: ${DATABASE_NAME?err}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - strapi-network
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-strapi}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME?err}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -29,14 +29,14 @@ services:
         DATABASE_CLIENT: postgres
         DATABASE_HOST: postgres
         DATABASE_PORT: 5432
-        DATABASE_NAME: ${DATABASE_NAME:-strapi}
-        DATABASE_USERNAME: ${DATABASE_USERNAME:-strapi}
-        DATABASE_PASSWORD: ${DATABASE_PASSWORD:-strapi_password}
-        JWT_SECRET: ${JWT_SECRET}
-        ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
-        APP_KEYS: ${APP_KEYS}
-        API_TOKEN_SALT: ${API_TOKEN_SALT}
-        TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+        DATABASE_NAME: ${DATABASE_NAME?err}
+        DATABASE_USERNAME: ${DATABASE_USERNAME?err}
+        DATABASE_PASSWORD: ${DATABASE_PASSWORD?err}
+        JWT_SECRET: ${JWT_SECRET?err}
+        ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET?err}
+        APP_KEYS: ${APP_KEYS?err}
+        API_TOKEN_SALT: ${API_TOKEN_SALT?err}
+        TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT?err}
     container_name: strapi-backend
     restart: unless-stopped
     environment:
@@ -44,14 +44,14 @@ services:
       DATABASE_CLIENT: postgres
       DATABASE_HOST: postgres
       DATABASE_PORT: 5432
-      DATABASE_NAME: ${DATABASE_NAME:-strapi}
-      DATABASE_USERNAME: ${DATABASE_USERNAME:-strapi}
-      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-strapi_password}
-      JWT_SECRET: ${JWT_SECRET}
-      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET}
-      APP_KEYS: ${APP_KEYS}
-      API_TOKEN_SALT: ${API_TOKEN_SALT}
-      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT}
+      DATABASE_NAME: ${DATABASE_NAME?err}
+      DATABASE_USERNAME: ${DATABASE_USERNAME?err}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD?err}
+      JWT_SECRET: ${JWT_SECRET?err}
+      ADMIN_JWT_SECRET: ${ADMIN_JWT_SECRET?err}
+      APP_KEYS: ${APP_KEYS?err}
+      API_TOKEN_SALT: ${API_TOKEN_SALT?err}
+      TRANSFER_TOKEN_SALT: ${TRANSFER_TOKEN_SALT?err}
       HOST: 0.0.0.0
       PORT: 1337
     volumes:
